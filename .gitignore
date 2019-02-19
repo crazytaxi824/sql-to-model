@@ -1,0 +1,9 @@
+/.vscode
+/.idea
+/pkg
+/*.iml
+/*.gorun
+/src/main/debug
+/debug
+/config.ini
+/.history
