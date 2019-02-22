@@ -144,6 +144,8 @@ func sqlTypeToGoType(dataType string) string {
 		finalType = "string"
 	case "jsonb":
 		finalType = "map[string]interface{}"
+	case "json":
+		finalType = "map[string]interface{}"
 	case "boolean":
 		finalType = "bool"
 	case "timestamptz":
