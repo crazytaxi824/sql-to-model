@@ -110,9 +110,9 @@ func genFileContent(models []Model, table TableStrcut) {
 	fileContent = fileContent + "tableName struct{} `sql:\"" + table.TabName + "\"` \r\n"
 	for _, model := range models {
 		if model.DataType != "jsonb" {
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\"` " + "//" + model.Note + "\r\n"
+			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
 		} else {
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `pg:\"" + model.ColumnName + ",json\"` " + "//" + model.Note + "\r\n"
+			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
 		}
 
 	}
@@ -184,6 +184,29 @@ func underLineToCamel(underLineStr string) string {
 		if len(v) > 0 {
 			CamelName = CamelName + strings.ToUpper(string(v[0])) + v[1:]
 		}
+	}
+
+	return CamelName
+}
+
+func underLineToJSONCamel(underLineStr string) string {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println(r)
+		}
+	}()
+	var CamelName string
+
+	ulStr := strings.TrimSpace(underLineStr)
+	ulSlice := strings.Split(ulStr, "_")
+	length := len(ulSlice)
+
+	if length > 1 {
+		for i := 1; i < length; i++ {
+			CamelName = ulSlice[0] + strings.ToUpper(string(ulSlice[i][0])) + ulSlice[i][1:]
+		}
+	}else{
+		CamelName = ulStr
 	}
 
 	return CamelName
