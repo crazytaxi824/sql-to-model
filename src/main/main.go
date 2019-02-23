@@ -32,13 +32,13 @@ type TableStrcut struct {
 func main() {
 	log.SetFlags(log.Lshortfile)
 
-	outputFilePath := flag.String("o", "./model.go", "gen model file from database")
+	outputFilePath := flag.String("o", "./Desktop/raymodel.go", "gen model file from database")
 	dbAddr := flag.String("a", "127.0.0.1", "database Addr")
 	dbPort := flag.String("p", "5432", "database Addr port")
 	dbUser := flag.String("u", "postgres", "database username")
 	dbPwd := flag.String("pwd", "", "database password, default - empty string")
 	dbDB := flag.String("db", "", "database name, default - empty string")
-	convert := flag.Bool("c", false, "convert ID int64 type to string —— bool")
+	convert := flag.Bool("c", false, "convert ID int64 type to string —— bool DEFAULT false")
 	flag.Parse()
 
 	// 连接数据库
@@ -131,7 +131,7 @@ func sqlTypeToGoType(dataType string) string {
 	case "integer":
 		finalType = "int"
 	case "smallint":
-		finalType = "int16"
+		finalType = "int"
 	case "decimal":
 		finalType = "float64"
 	case "numeric":
