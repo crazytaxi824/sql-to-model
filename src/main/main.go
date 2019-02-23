@@ -32,23 +32,14 @@ type TableStrcut struct {
 func main() {
 	log.SetFlags(log.Lshortfile)
 
-	// 配置文件路径，默认 "./config.ini"
-	// configFilePath := flag.String("c", "./config.ini", "config file path")
-	// 导出文件路径，默认 "./model.go"
 	outputFilePath := flag.String("o", "./model.go", "gen model file from database")
 	dbAddr := flag.String("a", "127.0.0.1", "database Addr")
 	dbPort := flag.String("p", "5432", "database Addr port")
 	dbUser := flag.String("u", "postgres", "database username")
 	dbPwd := flag.String("pwd", "", "database password, default - empty string")
 	dbDB := flag.String("db", "", "database name, default - empty string")
+	convert := flag.Bool("c", false, "convert ID int64 type to string —— bool")
 	flag.Parse()
-
-	// load配置文件
-	// err := loadConfig("./config.ini")
-	// if err != nil {
-	// 	log.Println(err.Error())
-	// 	return
-	// }
 
 	// 连接数据库
 	// openDB()
@@ -71,7 +62,7 @@ func main() {
 	}
 
 	for _, table := range tables {
-		getTableModel(table)
+		getTableModel(table, *convert)
 	}
 
 	// 写文件
@@ -90,7 +81,7 @@ func getAllTableNames() ([]TableStrcut, error) {
 }
 
 // 查询表中的所有字段和类型
-func getTableModel(table TableStrcut) {
+func getTableModel(table TableStrcut, convert bool) {
 	// 查询所有表的所有结构
 	var models []Model
 
@@ -101,16 +92,25 @@ func getTableModel(table TableStrcut) {
 	}
 
 	// 添加到文件内容中
-	genFileContent(models, table)
+	genFileContent(models, table, convert)
 }
 
-func genFileContent(models []Model, table TableStrcut) {
+func genFileContent(models []Model, table TableStrcut, convert bool) {
 	fileContent = fileContent + "// " + underLineToCamel(table.TabName) + " " + table.Note + "\r\n"
 	fileContent = fileContent + "type " + underLineToCamel(table.TabName) + " struct{\r\n"
 	fileContent = fileContent + "tableName struct{} `sql:\"" + table.TabName + "\"` \r\n"
 	for _, model := range models {
 		if model.DataType != "jsonb" {
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
+			l := len(model.ColumnName)
+			if convert && l > 1 {
+				if model.ColumnName[l-2:l] == "id" {
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
+				} else {
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
+				}
+			} else {
+				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
+			}
 		} else {
 			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
 		}
@@ -205,7 +205,7 @@ func underLineToJSONCamel(underLineStr string) string {
 		for i := 1; i < length; i++ {
 			CamelName = ulSlice[0] + strings.ToUpper(string(ulSlice[i][0])) + ulSlice[i][1:]
 		}
-	}else{
+	} else {
 		CamelName = ulStr
 	}
 
