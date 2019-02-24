@@ -32,7 +32,7 @@ type TableStrcut struct {
 func main() {
 	log.SetFlags(log.Lshortfile)
 
-	outputFilePath := flag.String("o", "./Desktop/raymodel.go", "gen model file from database")
+	outputFilePath := flag.String("o", "./Desktop/db_model.go", "gen model file from database")
 	dbAddr := flag.String("a", "127.0.0.1", "database Addr")
 	dbPort := flag.String("p", "5432", "database Addr port")
 	dbUser := flag.String("u", "postgres", "database username")
