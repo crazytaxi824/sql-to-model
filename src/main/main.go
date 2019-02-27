@@ -178,7 +178,12 @@ func underLineToCamel(underLineStr string) string {
 	var CamelName string
 
 	ulStr := strings.TrimSpace(underLineStr)
-	ulStr = strings.Replace(ulStr, "id", "ID", -1)
+	// 判断id后面是否有值
+	length := len(ulStr)
+	if ulStr[length-2:length] == "id" {
+		ulStr = ulStr[:length-2] + "ID"
+	}
+
 	ulSlice := strings.Split(ulStr, "_")
 	for _, v := range ulSlice {
 		if len(v) > 0 {
@@ -202,8 +207,9 @@ func underLineToJSONCamel(underLineStr string) string {
 	length := len(ulSlice)
 
 	if length > 1 {
+		CamelName = ulSlice[0]
 		for i := 1; i < length; i++ {
-			CamelName = ulSlice[0] + strings.ToUpper(string(ulSlice[i][0])) + ulSlice[i][1:]
+			CamelName = CamelName + strings.ToUpper(string(ulSlice[i][0])) + ulSlice[i][1:]
 		}
 	} else {
 		CamelName = ulStr
