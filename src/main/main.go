@@ -103,16 +103,16 @@ func genFileContent(models []Model, table TableStrcut, convert bool) {
 		if model.DataType != "jsonb" {
 			l := len(model.ColumnName)
 			if convert && l > 1 {
-				if model.ColumnName[l-2:l] == "id" {
-					fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
+				if model.ColumnName[l-2:l] == "id" && model.DataType == "bigint" {
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "// " + model.Note + "\r\n"
 				} else {
-					fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "// " + model.Note + "\r\n"
 				}
 			} else {
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
+				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "// " + model.Note + "\r\n"
 			}
 		} else {
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "//" + model.Note + "\r\n"
+			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "// " + model.Note + "\r\n"
 		}
 
 	}
