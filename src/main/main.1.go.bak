@@ -104,18 +104,28 @@ func genFileContent(models []Model, table TableStrcut) {
 	fileContent = fileContent + "type " + underLineToCamel(table.TabName) + " struct{\r\n"
 	fileContent = fileContent + "tableName struct{} `sql:\"" + table.TabName + "\"` \r\n"
 	for _, model := range models {
-		l := len(model.ColumnName)
-		if *convert && l > 1 {
-			if model.ColumnName[l-2:l] == "id" && model.DataType == "bigint" {
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
-				if *tagJSON {
-					fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
+		if model.DataType != "jsonb" {
+			l := len(model.ColumnName)
+			if *convert && l > 1 {
+				if model.ColumnName[l-2:l] == "id" && model.DataType == "bigint" {
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+					if *tagJSON {
+						fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
+					} else {
+						fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
+					}
 				} else {
-					fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
+					array, dataType := sqlTypeToGoType(model.DataType)
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `sql:\"" + model.ColumnName + array + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+					if *tagJSON {
+						fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
+					} else {
+						fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
+					}
 				}
 			} else {
-				suffix, dataType := sqlTypeToGoType(model.DataType)
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `sql:\"" + model.ColumnName + suffix + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+				array, dataType := sqlTypeToGoType(model.DataType)
+				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `sql:\"" + model.ColumnName + array + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
 				if *tagJSON {
 					fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
 				} else {
@@ -123,14 +133,15 @@ func genFileContent(models []Model, table TableStrcut) {
 				}
 			}
 		} else {
-			suffix, dataType := sqlTypeToGoType(model.DataType)
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `sql:\"" + model.ColumnName + suffix + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+			_, dataType := sqlTypeToGoType(model.DataType)
+			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName)
 			if *tagJSON {
 				fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
 			} else {
 				fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
 			}
 		}
+
 	}
 	fileContent = fileContent + "}\r\n\r\n"
 }
@@ -160,10 +171,8 @@ func sqlTypeToGoType(dataType string) (string, string) {
 		finalType = "string"
 	case "jsonb":
 		finalType = "map[string]interface{}"
-		return ",json", finalType
 	case "json":
 		finalType = "map[string]interface{}"
-		return ",json", finalType
 	case "boolean":
 		finalType = "bool"
 	case "timestamptz":
