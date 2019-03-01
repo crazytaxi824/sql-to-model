@@ -115,7 +115,8 @@ func genFileContent(models []Model, table TableStrcut) {
 						fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
 					}
 				} else {
-					fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+					array, dataType := sqlTypeToGoType(model.DataType)
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `sql:\"" + model.ColumnName + array + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
 					if *tagJSON {
 						fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
 					} else {
@@ -123,7 +124,8 @@ func genFileContent(models []Model, table TableStrcut) {
 					}
 				}
 			} else {
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+				array, dataType := sqlTypeToGoType(model.DataType)
+				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `sql:\"" + model.ColumnName + array + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
 				if *tagJSON {
 					fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
 				} else {
@@ -131,7 +133,8 @@ func genFileContent(models []Model, table TableStrcut) {
 				}
 			}
 		} else {
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName)
+			_, dataType := sqlTypeToGoType(model.DataType)
+			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName)
 			if *tagJSON {
 				fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
 			} else {
@@ -143,7 +146,7 @@ func genFileContent(models []Model, table TableStrcut) {
 	fileContent = fileContent + "}\r\n\r\n"
 }
 
-func sqlTypeToGoType(dataType string) string {
+func sqlTypeToGoType(dataType string) (string, string) {
 	var finalType string
 	n := strings.Count(dataType, "[]")
 	if n > 0 {
@@ -189,8 +192,9 @@ func sqlTypeToGoType(dataType string) string {
 			prefix = prefix + "[]"
 		}
 		finalType = prefix + finalType
+		return ",array", finalType
 	}
-	return finalType
+	return "", finalType
 }
 
 func underLineToCamel(underLineStr string) string {
