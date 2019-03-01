@@ -29,6 +29,9 @@ type TableStrcut struct {
 	Note    string `sql:"note"`
 }
 
+var convert *bool
+var tagJSON *bool
+
 func main() {
 	log.SetFlags(log.Lshortfile)
 
@@ -38,7 +41,8 @@ func main() {
 	dbUser := flag.String("u", "postgres", "database username")
 	dbPwd := flag.String("pwd", "", "database password, default - empty string")
 	dbDB := flag.String("db", "", "database name, default - empty string")
-	convert := flag.Bool("c", false, "convert ID int64 type to string —— bool DEFAULT false")
+	convert = flag.Bool("c", false, "convert ID int64 type to string —— bool DEFAULT false")
+	tagJSON = flag.Bool("j", false, "true, no omitempty —— bool DEFAULT false")
 	flag.Parse()
 
 	// 连接数据库
@@ -62,7 +66,7 @@ func main() {
 	}
 
 	for _, table := range tables {
-		getTableModel(table, *convert)
+		getTableModel(table)
 	}
 
 	// 写文件
@@ -81,7 +85,7 @@ func getAllTableNames() ([]TableStrcut, error) {
 }
 
 // 查询表中的所有字段和类型
-func getTableModel(table TableStrcut, convert bool) {
+func getTableModel(table TableStrcut) {
 	// 查询所有表的所有结构
 	var models []Model
 
@@ -92,27 +96,47 @@ func getTableModel(table TableStrcut, convert bool) {
 	}
 
 	// 添加到文件内容中
-	genFileContent(models, table, convert)
+	genFileContent(models, table)
 }
 
-func genFileContent(models []Model, table TableStrcut, convert bool) {
+func genFileContent(models []Model, table TableStrcut) {
 	fileContent = fileContent + "// " + underLineToCamel(table.TabName) + " " + table.Note + "\r\n"
 	fileContent = fileContent + "type " + underLineToCamel(table.TabName) + " struct{\r\n"
 	fileContent = fileContent + "tableName struct{} `sql:\"" + table.TabName + "\"` \r\n"
 	for _, model := range models {
 		if model.DataType != "jsonb" {
 			l := len(model.ColumnName)
-			if convert && l > 1 {
+			if *convert && l > 1 {
 				if model.ColumnName[l-2:l] == "id" && model.DataType == "bigint" {
-					fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "// " + model.Note + "\r\n"
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+					if *tagJSON {
+						fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
+					} else {
+						fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
+					}
 				} else {
-					fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "// " + model.Note + "\r\n"
+					fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+					if *tagJSON {
+						fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
+					} else {
+						fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
+					}
 				}
 			} else {
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "// " + model.Note + "\r\n"
+				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+				if *tagJSON {
+					fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
+				} else {
+					fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
+				}
 			}
 		} else {
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName) + ",omitempty\"` " + "// " + model.Note + "\r\n"
+			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + sqlTypeToGoType(model.DataType) + " `pg:\"" + model.ColumnName + ",json\" json:\"" + underLineToJSONCamel(model.ColumnName)
+			if *tagJSON {
+				fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
+			} else {
+				fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
+			}
 		}
 
 	}
