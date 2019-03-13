@@ -199,8 +199,16 @@ func underLineToCamel(underLineStr string) string {
 	ulStr := strings.TrimSpace(underLineStr)
 	// 判断id后面是否有值
 	length := len(ulStr)
-	if ulStr[length-2:length] == "id" {
-		ulStr = ulStr[:length-2] + "ID"
+	if length >= 2 {
+		if ulStr[length-2:length] == "id" {
+			ulStr = ulStr[:length-2] + "ID"
+		}
+	}
+
+	if length >= 3 {
+		if ulStr[length-3:length] == "url" {
+			ulStr = ulStr[:length-3] + "URL"
+		}
 	}
 
 	ulSlice := strings.Split(ulStr, "_")
