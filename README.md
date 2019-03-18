@@ -1,14 +1,13 @@
-# sql-to-model
+## sql-to-model
 
-#### 扫描postgresql数据库，创建go模型文件。
+### 扫描postgresql数据库，创建go模型文件。
 
-#### 使用方式：
+### 使用方式：
 
 $ stm -a 127.0.0.1 -p 5432 -pwd xxx -db postgres -o ~/Desktop/go_model.go
 -----
 
-#### 参数设置：
-
+### 参数设置：
   -a string
     	database Addr (default "127.0.0.1")
       
