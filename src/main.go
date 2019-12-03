@@ -1,32 +1,31 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io/ioutil"
 	"log"
 	"strings"
 
-	"github.com/go-ini/ini"
-	"github.com/go-pg/pg"
+	"github.com/go-pg/pg/v9"
 )
 
 var (
 	db          *pg.DB
-	cfg         *ini.File
 	fileContent string
 )
 
 // Model 字段名和字段注释
 type Model struct {
-	ColumnName string `sql:"name"`
-	DataType   string `sql:"type"`
-	Note       string `sql:"note"`
+	ColumnName string `pg:"name"`
+	DataType   string `pg:"type"`
+	Note       string `pg:"note"`
 }
 
-// TableStrcut 表名和表注释
+// Table Strcut 表名和表注释
 type TableStrcut struct {
-	TabName string `sql:"tabname"`
-	Note    string `sql:"note"`
+	TabName string `pg:"tabname"`
+	Note    string `pg:"note"`
 }
 
 var convert *bool
@@ -102,12 +101,12 @@ func getTableModel(table TableStrcut) {
 func genFileContent(models []Model, table TableStrcut) {
 	fileContent = fileContent + "// " + underLineToCamel(table.TabName) + " " + table.Note + "\r\n"
 	fileContent = fileContent + "type " + underLineToCamel(table.TabName) + " struct{\r\n"
-	fileContent = fileContent + "tableName struct{} `sql:\"" + table.TabName + "\"` \r\n"
+	fileContent = fileContent + "tableName struct{} `pg:\"" + table.TabName + "\"` \r\n"
 	for _, model := range models {
 		l := len(model.ColumnName)
 		if *convert && l > 1 {
 			if model.ColumnName[l-2:l] == "id" && model.DataType == "bigint" {
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `sql:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+				fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `pg:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
 				if *tagJSON {
 					fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
 				} else {
@@ -115,7 +114,7 @@ func genFileContent(models []Model, table TableStrcut) {
 				}
 			} else {
 				suffix, dataType := sqlTypeToGoType(model.DataType)
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `sql:\"" + model.ColumnName + suffix + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `pg:\"" + model.ColumnName + suffix + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
 				if *tagJSON {
 					fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
 				} else {
@@ -124,7 +123,7 @@ func genFileContent(models []Model, table TableStrcut) {
 			}
 		} else {
 			suffix, dataType := sqlTypeToGoType(model.DataType)
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `sql:\"" + model.ColumnName + suffix + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
+			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `pg:\"" + model.ColumnName + suffix + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
 			if *tagJSON {
 				fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
 			} else {
@@ -132,7 +131,7 @@ func genFileContent(models []Model, table TableStrcut) {
 			}
 		}
 	}
-	fileContent = fileContent + "}\r\n\r\n"
+	fileContent += "}\r\n\r\n"
 }
 
 func sqlTypeToGoType(dataType string) (string, string) {
@@ -160,10 +159,10 @@ func sqlTypeToGoType(dataType string) (string, string) {
 		finalType = "string"
 	case "jsonb":
 		finalType = "map[string]interface{}"
-		return ",json", finalType
+		// return ",json", finalType
 	case "json":
 		finalType = "map[string]interface{}"
-		return ",json", finalType
+		// return ",json", finalType
 	case "boolean":
 		finalType = "bool"
 	case "timestamptz":
@@ -180,7 +179,7 @@ func sqlTypeToGoType(dataType string) (string, string) {
 	if n > 0 {
 		var prefix string
 		for i := 0; i < n; i++ {
-			prefix = prefix + "[]"
+			prefix += "[]"
 		}
 		finalType = prefix + finalType
 		return ",array", finalType
@@ -256,31 +255,13 @@ func writeFile(outputFilePath string) {
 	log.Println("写入完成")
 }
 
-func openDB() {
-	sect := cfg.Section("database")
-	db = pg.Connect(&pg.Options{
-		Addr:     sect.Key("addr").String(),
-		User:     sect.Key("user").MustString("app"),
-		Password: sect.Key("password").String(),
-		Database: sect.Key("database").MustString("game"),
-	})
-
-	db.AddQueryHook(hook{})
-}
-
 type hook struct{}
 
-func (hook) BeforeQuery(qe *pg.QueryEvent) {}
-
-func (hook) AfterQuery(qe *pg.QueryEvent) {
-	log.Println(qe.FormattedQuery())
+func (hook) BeforeQuery(ctx context.Context, qe *pg.QueryEvent) (context.Context, error) {
+	return ctx, nil
 }
 
-func loadConfig(filePath string) error {
-	var err error
-	cfg, err = ini.Load(filePath)
-	if err != nil {
-		return err
-	}
+func (hook) AfterQuery(ctx context.Context, qe *pg.QueryEvent) error {
+	log.Println(qe.FormattedQuery())
 	return nil
 }
