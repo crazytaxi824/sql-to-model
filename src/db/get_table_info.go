@@ -2,15 +2,18 @@ package db
 
 import (
 	"context"
+
+	"github.com/uptrace/bun"
 )
 
 // Column 字段名和字段注释
 type Column struct {
-	Name     string `bun:"column:name"`    // table_column_name
-	DataType string `bun:"column:type"`    // bigint, text, jsonb ...
-	Dims     int    `bun:"column:dims"`    // array 的情况下 dims>0; 不是 array 的情况下 dims=0
-	Note     string `bun:"column:note"`    // comments
-	NotNull  bool   `bun:"column:notnull"` // attnotnull
+	TableName string `bun:"column:table_name"` // table_name, 用于绑定到 Table 结构体
+	Name      string `bun:"column:name"`       // table_column_name
+	DataType  string `bun:"column:type"`       // bigint, text, jsonb ...
+	Dims      int    `bun:"column:dims"`       // array 的情况下 dims>0; 不是 array 的情况下 dims=0
+	Note      string `bun:"column:note"`       // comments
+	NotNull   bool   `bun:"column:notnull"`    // attnotnull
 }
 
 // Table Strcut 表名和表注释
@@ -22,7 +25,21 @@ type Table struct {
 }
 
 // 查询数据库内的所有表
-func getAllTableNames(schema string) ([]Table, error) {
+func getAllTable(schema string) ([]Table, error) {
+	tables, err := getAllTableInfo(schema)
+	if err != nil {
+		return nil, err
+	}
+
+	err = getTableColumnsInfo(tables)
+	if err != nil {
+		return nil, err
+	}
+
+	return tables, nil
+}
+
+func getAllTableInfo(schema string) ([]Table, error) {
 	rows, err := db.Query(`
 		SELECT
 			obj_description(a.oid) as note,
@@ -42,19 +59,26 @@ func getAllTableNames(schema string) ([]Table, error) {
 		return nil, err
 	}
 
-	var table []Table
-	err = db.ScanRows(context.Background(), rows, &table)
+	var tables []Table
+	err = db.ScanRows(context.Background(), rows, &tables)
 	if err != nil {
 		return nil, err
 	}
 
-	return table, nil
+	return tables, nil
 }
 
-// 查询表中的所有字段和类型
-func getTableModel(tableName string) ([]Column, error) {
+// NOTE: 这里是在传入的 tables 上添加 column 信息, 所有 tables 本身不能进行 append 和 slice 等操作.
+func getTableColumnsInfo(tables []Table) error {
+	var tableNames []string
+	for _, table := range tables {
+		tableNames = append(tableNames, table.Name)
+	}
+
+	// 这里使用 IN 查询, 避免 N+1 问题.
 	rows, err := db.Query(`
 		SELECT
+			c.relname as table_name,
 			col_description(a.attrelid,a.attnum) as note,
 			format_type(a.atttypid,a.atttypmod) as type,
 			a.attname as name,
@@ -63,22 +87,31 @@ func getTableModel(tableName string) ([]Column, error) {
 		FROM pg_class as c
 		JOIN pg_attribute as a
 		ON a.attrelid = c.oid
-		WHERE c.relname = ? and a.attnum>0 and format_type(a.atttypid,a.atttypmod) <> '-';`, tableName)
+		WHERE c.relname IN (?) and a.attnum>0 and format_type(a.atttypid,a.atttypmod) <> '-';`, bun.In(tableNames))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
 	err = rows.Err()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var models []Column
-	err = db.ScanRows(context.Background(), rows, &models)
+	var cols []Column
+	err = db.ScanRows(context.Background(), rows, &cols)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return models, nil
+	// 处理 Table 结构体和 cols 的关系
+	for i := range tables {
+		for j := range cols {
+			if tables[i].Name == cols[j].TableName {
+				tables[i].Columns = append(tables[i].Columns, cols[j])
+			}
+		}
+	}
+
+	return nil
 }

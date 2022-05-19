@@ -39,13 +39,14 @@ func main() {
 
 // 生成 model 结构体
 func genStructContent(tables []db.Table) []string {
-	var content []string
+	var content = []string{"package\n", "import (", "\t\"github.com/uptrace/bun\"", ")\n"}
+
 	for _, table := range tables {
 		if table.Note != "" {
-			content = append(content, "// "+table.Note) // table note
+			content = append(content, "// "+table.Note) // table comments
 		}
-		content = append(content, fmt.Sprintf("type %s struct {", table.Name))                                    // table name
-		content = append(content, fmt.Sprintf("\tbun.BaseModel `bun:\"table:%s.%s\"`", table.Schema, table.Name)) // table name
+		content = append(content, fmt.Sprintf("type %s struct {", structFieldName(table.Name)))                   // table name
+		content = append(content, fmt.Sprintf("\tbun.BaseModel `bun:\"table:%s.%s\"`", table.Schema, table.Name)) // table name tag
 
 		for _, col := range table.Columns {
 			tag, typ := db.SqlTypeToGoType(col)

@@ -42,17 +42,9 @@ func FindsAllTable(conf DBConfig) ([]Table, error) {
 	openDB(conf)
 
 	// 获取所有 table
-	tables, err := getAllTableNames(*conf.Schema)
+	tables, err := getAllTable(*conf.Schema)
 	if err != nil {
 		return nil, err
-	}
-
-	// 获取每一个 table 的所有 column
-	for k := range tables {
-		tables[k].Columns, err = getTableModel(tables[k].Name)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return tables, nil
