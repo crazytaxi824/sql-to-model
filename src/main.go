@@ -2,80 +2,134 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
-	"io/ioutil"
+	"fmt"
+	"local/src/util"
 	"log"
 	"strings"
+	"time"
 
-	"github.com/go-pg/pg/v9"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 )
 
-var (
-	db          *pg.DB
-	fileContent string
-)
+var db *bun.DB
 
-// Model 字段名和字段注释
-type Model struct {
-	ColumnName string `pg:"name"`
-	DataType   string `pg:"type"`
-	Note       string `pg:"note"`
+// Column 字段名和字段注释
+type Column struct {
+	Name     string `bun:"column:name"`
+	DataType string `bun:"column:type"`
+	Dims     int    `bun:"column:dims"` // array 的情况下 dims>0; 不是 array 的情况下 dims=0
+	Note     string `bun:"column:note"`
+	NotNull  bool   `bun:"column:notnull"`
 }
 
 // Table Strcut 表名和表注释
-type TableStrcut struct {
-	TabName string `pg:"tabname"`
-	Note    string `pg:"note"`
+type Table struct {
+	Schema  string   `bun:"column:schema"`
+	Name    string   `bun:"column:name"`
+	Note    string   `bun:"column:note"`
+	Columns []Column `bun:"-"`
 }
-
-var convert *bool
-var tagJSON *bool
 
 func main() {
 	log.SetFlags(log.Lshortfile)
 
-	outputFilePath := flag.String("o", "./Desktop/db_model.go", "gen model file from database")
-	dbAddr := flag.String("a", "127.0.0.1", "database Addr")
-	dbPort := flag.String("p", "5432", "database Addr port")
+	dbAddr := flag.String("a", "localhost:5432", "database Addr")
 	dbUser := flag.String("u", "postgres", "database username")
-	dbPwd := flag.String("pwd", "", "database password, default - empty string")
-	dbDB := flag.String("db", "", "database name, default - empty string")
-	convert = flag.Bool("c", false, "convert ID int64 type to string —— bool DEFAULT false")
-	tagJSON = flag.Bool("j", false, "true, no omitempty —— bool DEFAULT false")
+	dbPwd := flag.String("p", "", "database password")
+	dbName := flag.String("n", "test", "database name")
+	dbSchema := flag.String("s", "public", "database schema")
 	flag.Parse()
 
 	// 连接数据库
+	pgconn := pgdriver.NewConnector(
+		pgdriver.WithAddr(*dbAddr),
+		pgdriver.WithInsecure(true),
+		pgdriver.WithUser(*dbUser),
+		pgdriver.WithPassword(*dbPwd),
+		pgdriver.WithDatabase(*dbName),
+		pgdriver.WithTimeout(5*time.Second),
+	)
+
 	// openDB()
-	db = pg.Connect(&pg.Options{
-		Addr:     *dbAddr + ":" + *dbPort,
-		User:     *dbUser,
-		Password: *dbPwd,
-		Database: *dbDB,
-	})
-	// 打印sql 语句
-	// db.AddQueryHook(hook{})
+	sqldb := sql.OpenDB(pgconn)
+	db = bun.NewDB(sqldb, pgdialect.New())
 
-	// 写package
-	fileContent = "package \r\n\r\n"
+	// DEBUG: 打印sql 语句
+	// db.AddQueryHook(&util.QueryHook{})
 
-	tables, err := getAllTableNames()
+	// 获取所有 table
+	tables, err := getAllTableNames(*dbSchema)
 	if err != nil {
 		log.Println(err.Error())
 		return
 	}
 
-	for _, table := range tables {
-		getTableModel(table)
+	// 获取每一个 table 的所有 column
+	for k := range tables {
+		tables[k].Columns, err = getTableModel(tables[k].Name)
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 
-	// 写文件
-	writeFile(*outputFilePath)
+	// 生成内容
+	r := genStructContent(tables)
+	fmt.Println(strings.Join(r, "\n"))
+}
+
+// 生成 model 结构体
+func genStructContent(tables []Table) []string {
+	var content []string
+	for _, table := range tables {
+		if table.Note != "" {
+			content = append(content, "// "+table.Note) // table note
+		}
+		content = append(content, fmt.Sprintf("type %s struct {", table.Name))                                    // table name
+		content = append(content, fmt.Sprintf("\tbun.BaseModel `bun:\"table:%s.%s\"`", table.Schema, table.Name)) // table name
+
+		for _, col := range table.Columns {
+			tag, typ := sqlTypeToGoType(col)
+			if col.Note != "" {
+				content = append(content, fmt.Sprintf("\t%s %s `bun:\"column:%s%s\"` // %s", util.StructFieldName(col.Name), typ, col.Name, tag, col.Note))
+			} else {
+				content = append(content, fmt.Sprintf("\t%s %s `bun:\"column:%s%s\"`", util.StructFieldName(col.Name), typ, col.Name, tag))
+			}
+		}
+
+		content = append(content, "}\n") // struct end
+	}
+
+	return content
 }
 
 // 查询数据库内的所有表
-func getAllTableNames() ([]TableStrcut, error) {
-	var table []TableStrcut
-	_, err := db.Query(&table, "SELECT obj_description(oid) as note, relname as tabname FROM pg_class WHERE relkind = 'r' AND relname NOT LIKE 'pg_%' AND relname NOT LIKE 'sql_%' ORDER BY relname;")
+func getAllTableNames(schema string) ([]Table, error) {
+	rows, err := db.Query(`
+		SELECT
+			obj_description(a.oid) as note,
+			a.relname as name,
+			b.nspname as schema
+		FROM pg_class a
+		JOIN pg_namespace b
+		ON b.oid = a.relnamespace
+		WHERE a.relkind = 'r' AND b.nspname = ?;`, schema)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	var table []Table
+	err = db.ScanRows(context.Background(), rows, &table)
 	if err != nil {
 		return nil, err
 	}
@@ -84,184 +138,112 @@ func getAllTableNames() ([]TableStrcut, error) {
 }
 
 // 查询表中的所有字段和类型
-func getTableModel(table TableStrcut) {
-	// 查询所有表的所有结构
-	var models []Model
-
-	_, err := db.Query(&models, `SELECT col_description(a.attrelid,a.attnum) as note,format_type(a.atttypid,a.atttypmod) as type,a.attname as name FROM pg_class as c,pg_attribute as a where c.relname = '`+table.TabName+`' and a.attrelid = c.oid and a.attnum>0 and format_type(a.atttypid,a.atttypmod) <> '-'`)
+func getTableModel(tableName string) ([]Column, error) {
+	rows, err := db.Query(`
+		SELECT
+			col_description(a.attrelid,a.attnum) as note,
+			format_type(a.atttypid,a.atttypmod) as type,
+			a.attname as name,
+			a.attnotnull as notnull,
+			a.attndims as dims
+		FROM pg_class as c
+		JOIN pg_attribute as a
+		ON a.attrelid = c.oid
+		WHERE c.relname = ? and a.attnum>0 and format_type(a.atttypid,a.atttypmod) <> '-';`, tableName)
 	if err != nil {
-		log.Println(err.Error())
-		return
+		return nil, err
+	}
+	defer rows.Close()
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
 	}
 
-	// 添加到文件内容中
-	genFileContent(models, table)
-}
-
-func genFileContent(models []Model, table TableStrcut) {
-	fileContent = fileContent + "// " + underLineToCamel(table.TabName) + " " + table.Note + "\r\n"
-	fileContent = fileContent + "type " + underLineToCamel(table.TabName) + " struct{\r\n"
-	fileContent = fileContent + "tableName struct{} `pg:\"" + table.TabName + "\"` \r\n"
-	for _, model := range models {
-		l := len(model.ColumnName)
-		if *convert && l > 1 {
-			if model.ColumnName[l-2:l] == "id" && model.DataType == "bigint" {
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " string `pg:\"" + model.ColumnName + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
-				if *tagJSON {
-					fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
-				} else {
-					fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
-				}
-			} else {
-				suffix, dataType := sqlTypeToGoType(model.DataType)
-				fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `pg:\"" + model.ColumnName + suffix + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
-				if *tagJSON {
-					fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
-				} else {
-					fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
-				}
-			}
-		} else {
-			suffix, dataType := sqlTypeToGoType(model.DataType)
-			fileContent = fileContent + underLineToCamel(model.ColumnName) + " " + dataType + " `pg:\"" + model.ColumnName + suffix + "\" json:\"" + underLineToJSONCamel(model.ColumnName)
-			if *tagJSON {
-				fileContent = fileContent + "\"` " + "// " + model.Note + "\r\n"
-			} else {
-				fileContent = fileContent + ",omitempty\"` " + "// " + model.Note + "\r\n"
-			}
-		}
+	var models []Column
+	err = db.ScanRows(context.Background(), rows, &models)
+	if err != nil {
+		return nil, err
 	}
-	fileContent += "}\r\n\r\n"
+
+	return models, nil
 }
 
-func sqlTypeToGoType(dataType string) (string, string) {
+// map pgsql data type to golang data type
+func sqlTypeToGoType(col Column) (string, string) {
 	var finalType string
-	n := strings.Count(dataType, "[]")
-	if n > 0 {
-		dataType = strings.Replace(dataType, "[]", "", -1)
+	var finalTag string
+
+	// 判断是否是 array 类型, 获取 array 维度.
+	// However, the current implementation ignores any supplied array size limits, i.e. 'text[3][2]' 等于 'text[][]'
+	if col.Dims > 0 {
+		col.DataType = strings.ReplaceAll(col.DataType, "[]", "")
+		finalTag += ",type:" + col.DataType + ",array"
+	} else {
+		finalTag += ",type:" + col.DataType
 	}
-	switch dataType {
-	case "bigint":
-		finalType = "int64"
-	case "integer":
-		finalType = "int"
-	case "smallint":
-		finalType = "int"
-	case "decimal":
-		finalType = "float64"
-	case "numeric":
-		finalType = "float64"
-	case "double precision":
-		finalType = "float64"
+
+	switch col.DataType {
+	case "bigint": // int8
+		if col.NotNull || col.Dims > 0 {
+			finalType = "int64"
+		} else {
+			finalType = "*int64"
+		}
+	case "integer": // int/int4
+		if col.NotNull || col.Dims > 0 {
+			finalType = "int"
+		} else {
+			finalType = "*int"
+		}
+	case "smallint": // int2
+		if col.NotNull || col.Dims > 0 {
+			finalType = "int16"
+		} else {
+			finalType = "*int16"
+		}
+	case "decimal", "numeric", "double precision":
+		if col.NotNull || col.Dims > 0 {
+			finalType = "float64"
+		} else {
+			finalType = "*float64"
+		}
 	case "real":
-		finalType = "float32"
+		if col.NotNull || col.Dims > 0 {
+			finalType = "float32"
+		} else {
+			finalType = "*float32"
+		}
 	case "text":
-		finalType = "string"
-	case "jsonb":
-		finalType = "map[string]interface{}"
-		// return ",json", finalType
-	case "json":
-		finalType = "map[string]interface{}"
-		// return ",json", finalType
+		if col.NotNull || col.Dims > 0 {
+			finalType = "string"
+		} else {
+			finalType = "*string"
+		}
+	case "json", "jsonb":
+		// json array 和 native array 的储存方式是不同的.
+		// json array 储存的就是 json 格式 [1,2,3], 可以通过 pgsql 的 json 操作符操作单个元素.
+		// native array 储存的是 {x,x,x} 格式, 如果要修改单个元素需要全部读出来, 然后修改后再写入.
+		finalType = "-- map[string]interface{}|[]slice|json.RawMessage --"
 	case "boolean":
-		finalType = "bool"
-	case "timestamptz":
-		finalType = "time.Time"
+		if col.NotNull || col.Dims > 0 {
+			finalType = "bool"
+		} else {
+			finalType = "*bool"
+		}
 	case "bytea":
 		finalType = "[]byte"
 	case "inet":
-		finalType = "net.IP"
-	case "cidr":
-		finalType = "net.IPNet"
+		finalType = "net.IP" // []byte
 	default:
 		finalType = "-- 请手动绑定数据类型 --"
 	}
-	if n > 0 {
-		var prefix string
-		for i := 0; i < n; i++ {
-			prefix += "[]"
-		}
-		finalType = prefix + finalType
-		return ",array", finalType
-	}
-	return "", finalType
-}
 
-func underLineToCamel(underLineStr string) string {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println(r)
-		}
-	}()
-	var CamelName string
-
-	ulStr := strings.TrimSpace(underLineStr)
-	// 判断id后面是否有值
-	length := len(ulStr)
-	if length >= 2 {
-		if ulStr[length-2:length] == "id" {
-			ulStr = ulStr[:length-2] + "ID"
-		}
+	// 如果是 array, 则需要使用 []type 类型, 同时在 tag 中添加 ",array"
+	if col.Dims > 0 {
+		finalType = strings.Repeat("[]", col.Dims) + finalType
+		return finalTag, finalType
 	}
 
-	if length >= 3 {
-		if ulStr[length-3:length] == "url" {
-			ulStr = ulStr[:length-3] + "URL"
-		}
-	}
-
-	ulSlice := strings.Split(ulStr, "_")
-	for _, v := range ulSlice {
-		if len(v) > 0 {
-			CamelName = CamelName + strings.ToUpper(string(v[0])) + v[1:]
-		}
-	}
-
-	return CamelName
-}
-
-func underLineToJSONCamel(underLineStr string) string {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println(r)
-		}
-	}()
-	var CamelName string
-
-	ulStr := strings.TrimSpace(underLineStr)
-	ulSlice := strings.Split(ulStr, "_")
-	length := len(ulSlice)
-
-	if length > 1 {
-		CamelName = ulSlice[0]
-		for i := 1; i < length; i++ {
-			CamelName = CamelName + strings.ToUpper(string(ulSlice[i][0])) + ulSlice[i][1:]
-		}
-	} else {
-		CamelName = ulStr
-	}
-
-	return CamelName
-}
-
-// 写文件
-func writeFile(outputFilePath string) {
-	// goFile := fileContent
-	err := ioutil.WriteFile(outputFilePath, []byte(fileContent), 0644)
-	if err != nil {
-		log.Println(err.Error())
-		return
-	}
-	log.Println("写入完成")
-}
-
-type hook struct{}
-
-func (hook) BeforeQuery(ctx context.Context, qe *pg.QueryEvent) (context.Context, error) {
-	return ctx, nil
-}
-
-func (hook) AfterQuery(ctx context.Context, qe *pg.QueryEvent) error {
-	log.Println(qe.FormattedQuery())
-	return nil
+	return finalTag, finalType
 }
