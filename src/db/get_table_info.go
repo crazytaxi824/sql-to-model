@@ -68,7 +68,7 @@ func getAllTableInfo(schema string) ([]Table, error) {
 	return tables, nil
 }
 
-// NOTE: 这里是在传入的 tables 上添加 column 信息, 所有 tables 本身不能进行 append 和 slice 等操作.
+// NOTE: 这里是在传入的 []Table 上添加 column 信息, 所以 []Table 本身不能进行 append 和 slice 等操作.
 func getTableColumnsInfo(tables []Table) error {
 	var tableNames []string
 	for _, table := range tables {

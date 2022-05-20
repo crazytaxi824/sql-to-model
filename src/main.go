@@ -22,6 +22,7 @@ func main() {
 	dbconf.Name = flag.String("n", "test", "database name")
 	// dbconf.Name = flag.String("n", "", "database name")
 	dbconf.Schema = flag.String("s", "public", "database schema")
+	pkg := flag.String("k", "model", "go package name")
 	flag.Parse()
 
 	tables, err := db.FindsAllTable(dbconf)
@@ -31,15 +32,15 @@ func main() {
 	}
 
 	// for table info to go struct format
-	r := genStructContent(tables)
+	r := genStructContent(tables, *pkg)
 
 	// print MODEL struct
 	fmt.Println(strings.Join(r, "\n"))
 }
 
 // 生成 model 结构体
-func genStructContent(tables []db.Table) []string {
-	var content = []string{"package\n", "import (", "\t\"github.com/uptrace/bun\"", ")\n"}
+func genStructContent(tables []db.Table, pkg string) []string {
+	var content = []string{"package " + pkg, "", "import (", "\t\"github.com/uptrace/bun\"", ")\n"}
 
 	for _, table := range tables {
 		if table.Note != "" {
@@ -49,12 +50,23 @@ func genStructContent(tables []db.Table) []string {
 		content = append(content, fmt.Sprintf("\tbun.BaseModel `bun:\"table:%s.%s\"`", table.Schema, table.Name)) // table name tag
 
 		for _, col := range table.Columns {
-			tag, typ := db.SqlTypeToGoType(col)
-			if col.Note != "" {
-				content = append(content, fmt.Sprintf("\t%s %s `bun:\"column:%s%s\"` // %s", structFieldName(col.Name), typ, col.Name, tag, col.Note))
+			gt := db.SqlTypeToGoType(col)
+
+			var structField string
+
+			// 是否需要手动确定 struct field Data Type
+			if gt.Manual {
+				structField = fmt.Sprintf("\t// %s %s `bun:\"column:%s%s\"`", structFieldName(col.Name), gt.Type, col.Name, gt.Tag)
 			} else {
-				content = append(content, fmt.Sprintf("\t%s %s `bun:\"column:%s%s\"`", structFieldName(col.Name), typ, col.Name, tag))
+				structField = fmt.Sprintf("\t%s %s `bun:\"column:%s%s\"`", structFieldName(col.Name), gt.Type, col.Name, gt.Tag)
 			}
+
+			// 如果 sql column 有 comments
+			if col.Note != "" {
+				structField += fmt.Sprintf(" // %s", col.Note)
+			}
+
+			content = append(content, structField)
 		}
 
 		content = append(content, "}\n") // struct end
