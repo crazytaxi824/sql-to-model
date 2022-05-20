@@ -18,7 +18,6 @@ func main() {
 	dbconf.User = flag.String("u", "postgres", "database username")
 	dbconf.Password = flag.String("p", "", "database password")
 	dbconf.Name = flag.String("n", "test", "database name")
-	dbconf.Schema = flag.String("s", "public", "database schema")
 	pkg := flag.String("k", "model", "go package name")
 	flag.Parse()
 
@@ -38,7 +37,7 @@ func main() {
 // 生成 model 结构体
 func genStructContent(conf db.DBConfig, tables []db.Table, pkg string) []string {
 	var content = []string{
-		fmt.Sprintf("// all tables from database: \"%s\", schema: \"%s\"", *conf.Name, *conf.Schema),
+		fmt.Sprintf("// all tables from database: \"%s\"", *conf.Name),
 		"package " + pkg,
 		"",
 		"import (", "\t\"github.com/uptrace/bun\"", ")\n",

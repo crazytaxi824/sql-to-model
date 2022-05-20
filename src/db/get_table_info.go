@@ -25,8 +25,8 @@ type Table struct {
 }
 
 // 查询数据库内的所有表
-func getAllTable(schema string) ([]Table, error) {
-	tables, err := getAllTableInfo(schema)
+func getAllTable() ([]Table, error) {
+	tables, err := getAllTableInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,8 @@ func getAllTable(schema string) ([]Table, error) {
 	return tables, nil
 }
 
-func getAllTableInfo(schema string) ([]Table, error) {
+func getAllTableInfo() ([]Table, error) {
+	// `select * from pg_namespace;` all schema
 	rows, err := db.Query(`
 		SELECT
 			obj_description(a.oid) as note,
@@ -48,7 +49,7 @@ func getAllTableInfo(schema string) ([]Table, error) {
 		FROM pg_class a
 		JOIN pg_namespace b
 		ON b.oid = a.relnamespace
-		WHERE a.relkind = 'r' AND b.nspname = ?;`, schema)
+		WHERE a.relkind = 'r' AND b.nspname !~ '^pg_' AND nspname <> 'information_schema';`)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +88,7 @@ func getTableColumnsInfo(tables []Table) error {
 		FROM pg_class as c
 		JOIN pg_attribute as a
 		ON a.attrelid = c.oid
-		WHERE c.relname IN (?) and a.attnum>0 and format_type(a.atttypid,a.atttypmod) <> '-';`, bun.In(tableNames))
+		WHERE c.relname IN (?) and a.attnum>0 AND format_type(a.atttypid,a.atttypmod) <> '-';`, bun.In(tableNames))
 	if err != nil {
 		return err
 	}

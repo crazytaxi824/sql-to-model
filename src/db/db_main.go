@@ -15,7 +15,6 @@ type DBConfig struct {
 	Addr     *string
 	User     *string
 	Password *string
-	Schema   *string
 	Name     *string
 }
 
@@ -42,7 +41,7 @@ func FindsAllTable(conf DBConfig) ([]Table, error) {
 	openDB(conf)
 
 	// 获取所有 table
-	tables, err := getAllTable(*conf.Schema)
+	tables, err := getAllTable()
 	if err != nil {
 		return nil, err
 	}
