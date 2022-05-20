@@ -14,13 +14,10 @@ func main() {
 
 	// setup flags
 	var dbconf db.DBConfig
-	dbconf.Addr = flag.String("a", "192.168.0.193:15432", "database Addr")
-	// dbconf.Addr = flag.String("a", "localhost:5432", "database Addr")
+	dbconf.Addr = flag.String("a", "localhost:5432", "database Addr")
 	dbconf.User = flag.String("u", "postgres", "database username")
-	dbconf.Password = flag.String("p", "123456", "database password")
-	// dbconf.Password = flag.String("p", "", "database password")
+	dbconf.Password = flag.String("p", "", "database password")
 	dbconf.Name = flag.String("n", "test", "database name")
-	// dbconf.Name = flag.String("n", "", "database name")
 	dbconf.Schema = flag.String("s", "public", "database schema")
 	pkg := flag.String("k", "model", "go package name")
 	flag.Parse()
@@ -51,8 +48,11 @@ func genStructContent(conf db.DBConfig, tables []db.Table, pkg string) []string 
 		if table.Note != "" {
 			content = append(content, "// "+table.Note) // table comments
 		}
-		content = append(content, fmt.Sprintf("type %s struct {", structFieldName(table.Name)))                   // table name
-		content = append(content, fmt.Sprintf("\tbun.BaseModel `bun:\"table:%s.%s\"`", table.Schema, table.Name)) // table name tag
+
+		content = append(content,
+			fmt.Sprintf("type %s struct {", structFieldName(table.Name))) // table name
+		content = append(content,
+			fmt.Sprintf("\tbun.BaseModel `bun:\"table:%s.%s\"`", table.Schema, table.Name)) // table name tag
 
 		for _, col := range table.Columns {
 			gt := db.SqlTypeToGoType(col)
