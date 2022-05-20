@@ -32,15 +32,20 @@ func main() {
 	}
 
 	// for table info to go struct format
-	r := genStructContent(tables, *pkg)
+	r := genStructContent(dbconf, tables, *pkg)
 
 	// print MODEL struct
 	fmt.Println(strings.Join(r, "\n"))
 }
 
 // 生成 model 结构体
-func genStructContent(tables []db.Table, pkg string) []string {
-	var content = []string{"package " + pkg, "", "import (", "\t\"github.com/uptrace/bun\"", ")\n"}
+func genStructContent(conf db.DBConfig, tables []db.Table, pkg string) []string {
+	var content = []string{
+		fmt.Sprintf("// all tables from database: \"%s\", schema: \"%s\"", *conf.Name, *conf.Schema),
+		"package " + pkg,
+		"",
+		"import (", "\t\"github.com/uptrace/bun\"", ")\n",
+	}
 
 	for _, table := range tables {
 		if table.Note != "" {
