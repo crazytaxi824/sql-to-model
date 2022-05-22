@@ -16,7 +16,6 @@ type queryResp struct {
 	ColumnName    string `bun:"column:column_name"` // column name
 	ColumnNote    string `bun:"column:column_note"` // column comments
 	ColumnType    string `bun:"column:column_type"` // column data type
-	ColumnNum     int    `bun:"column:column_num"`  // column 排序用
 	ColumnNotNull bool   `bun:"column:not_null"`    // 是否允许 null
 	ColumnDims    int    `bun:"column:dims"`        // array 类型维度
 }
@@ -50,7 +49,6 @@ func getAllSchemaTableColumnInfo() ([]queryResp, error) {
 	err := db.NewSelect().TableExpr("? as a", bun.Ident("pg_attribute")).
 		Column("b.*").
 		ColumnExpr("? AS column_name", bun.Ident("a.attname")).
-		ColumnExpr("? AS column_num", bun.Ident("a.attnum")).
 		ColumnExpr("? AS not_null", bun.Ident("a.attnotnull")).
 		ColumnExpr("? AS dims", bun.Ident("a.attndims")).
 		ColumnExpr("? AS column_note", bun.Safe("col_description(a.attrelid,a.attnum)")).

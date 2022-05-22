@@ -39,3 +39,40 @@ func TestSubQuery(t *testing.T) {
 		fmt.Printf("%+v\n", r[i])
 	}
 }
+
+func TestTableInfo(t *testing.T) {
+	var ti TableObj
+	ti.tables = make(map[int64]Table)
+
+	// 连接数据库
+	pgconn := pgdriver.NewConnector(
+		pgdriver.WithAddr("192.168.0.193:15432"),
+		pgdriver.WithInsecure(true),
+		pgdriver.WithUser("postgres"),
+		pgdriver.WithPassword("123456"),
+		pgdriver.WithDatabase("test"),
+		pgdriver.WithTimeout(5*time.Second),
+	)
+
+	// openDB()
+	sqldb := sql.OpenDB(pgconn)
+	db = bun.NewDB(sqldb, pgdialect.New())
+
+	// DEBUG: 打印sql 语句
+	db.AddQueryHook(&queryHook{})
+
+	r, err := getAllSchemaTableColumnInfo()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	for i := range r {
+		ti.addTableInfo(r[i])
+	}
+
+	tables := ti.SortedOutput()
+	for _, table := range tables {
+		fmt.Printf("%+v\n", table)
+	}
+}
