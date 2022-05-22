@@ -48,3 +48,22 @@ func FindsAllTable(conf DBConfig) ([]Table, error) {
 
 	return tables, nil
 }
+
+// 查询数据库内的所有表
+func getAllTable() ([]Table, error) {
+	resp, err := getAllSchemaTableColumnInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	// 初始化 TableInfo
+	var ti TableObj
+	ti.tables = make(map[int64]Table)
+
+	// 添加数据
+	for i := range resp {
+		ti.addTableInfo(resp[i])
+	}
+
+	return ti.SortedOutput(), nil
+}
