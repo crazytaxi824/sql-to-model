@@ -26,6 +26,7 @@ WHERE attrelid IN (16385, 16435, 16393...) AND attnum>0 AND format_type(atttypid
 -- 这里是查询所有 column attributes 的 query.
 SELECT
 	b.*,
+    -- a.atttypid as column_type_id, -- pg_type oid
 	a.attname as column_name,
 	col_description(a.attrelid,a.attnum) as column_note,
 	format_type(a.atttypid,a.atttypmod) as column_type,
@@ -41,7 +42,7 @@ JOIN (
 		c.oid as table_id,
 		c.relname as table_name,
 		obj_description(c.oid) as table_note,
-		c.relkind as table_or_view    -- 'r' = table; 'v' = view
+		c.relkind as table_kind    -- 'r' = table; 'v' = view
 	FROM pg_class as c
 	JOIN (
 			-- 这里是查询所有 schema 的 subquery.
@@ -53,8 +54,8 @@ JOIN (
 	WHERE c.relnamespace IN (s.oid) AND c.relkind IN ('r', 'v')
 ) as b
 ON a.attrelid = b.table_id
-WHERE attrelid IN (b.table_id) AND attnum>0 AND format_type(atttypid, atttypmod) <> '-'
-ORDER BY (b.table_id, a.attnum) ASC;
+WHERE a.attrelid IN (b.table_id) AND a.attnum>0 AND format_type(a.atttypid, a.atttypmod) <> '-'
+ORDER BY b.table_kind ASC, b.schema_id ASC, b.table_id ASC, a.attnum ASC;  -- table_kind 排序将 view 统一放在最后.
 ```
 
 <br />
@@ -90,23 +91,23 @@ $ stm -a 127.0.0.1 -p 5432 -pwd xxx -db postgres -o ~/Desktop/go_model.go
 ```bash
   -a string
     	database Addr (default "127.0.0.1")
-      
+
   -c	convert ID int64 type to string —— bool DEFAULT false
-  
+
   -db string
     	database name, default - empty string
-      
+
   -j	true, no omitempty —— bool DEFAULT false
-  
+
   -o string
     	gen model file from database (default "./Desktop/db_model.go")
-      
+
   -p string
     	database Addr port (default "5432")
-      
+
   -pwd string
     	database password, default - empty string
-      
+
   -u string
     	database username (default "postgres")
 ```
