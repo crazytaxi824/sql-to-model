@@ -49,7 +49,7 @@ func getAllTableInfo() ([]Table, error) {
 		FROM pg_class a
 		JOIN pg_namespace b
 		ON b.oid = a.relnamespace
-		WHERE a.relkind = 'r' AND b.nspname !~ '^pg_' AND nspname <> 'information_schema';`)
+		WHERE a.relkind IN ('r', 'v') AND b.nspname !~ '^pg_' AND nspname <> 'information_schema';`)
 	if err != nil {
 		return nil, err
 	}
