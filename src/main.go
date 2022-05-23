@@ -4,40 +4,93 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"local/src/db"
 )
 
+type flagConfig struct {
+	db    db.Config
+	query db.QueryOpts
+
+	// other flags
+	gopkg *string
+}
+
+func setFlags() flagConfig {
+	var fc flagConfig
+
+	// database config flags
+	fc.db.Addr = flag.String("addr", "localhost:5432", "database Addr")
+	fc.db.User = flag.String("user", "postgres", "database username")
+	fc.db.Password = flag.String("password", "", "database password")
+	fc.db.Name = flag.String("database", "test", "database name")
+
+	// query flags
+	fc.query.Schemas = flag.String("schema", "", "specify schema list. eg:'foo,bar'\nomitempty - all schemas")
+	fc.query.Tables = flag.String("table", "", "specify table list. eg:'foo,bar'\nomitempty - all tables")
+	fc.query.TableKind = flag.String("kind", "", "specify table or view.\n't', 'r', 'table' - table only;\n'v', 'view' - view only;\nomitempty, others - tables and views")
+
+	// other flags
+	fc.gopkg = flag.String("gopkg", "model", "go package name")
+
+	// alias
+	addr := flag.Lookup("addr")
+	flag.Var(addr.Value, "a", fmt.Sprintf("alias to '-%s'", addr.Name))
+
+	user := flag.Lookup("user")
+	flag.Var(user.Value, "u", fmt.Sprintf("alias to '-%s'", user.Name))
+
+	password := flag.Lookup("password")
+	flag.Var(password.Value, "p", fmt.Sprintf("alias to '-%s'", password.Name))
+
+	database := flag.Lookup("database")
+	flag.Var(database.Value, "db", fmt.Sprintf("alias to '-%s'", database.Name))
+
+	schema := flag.Lookup("schema")
+	flag.Var(schema.Value, "s", fmt.Sprintf("alias to '-%s'", schema.Name))
+
+	table := flag.Lookup("table")
+	flag.Var(table.Value, "t", fmt.Sprintf("alias to '-%s'", table.Name))
+
+	kind := flag.Lookup("kind")
+	flag.Var(kind.Value, "k", fmt.Sprintf("alias to '-%s'", kind.Name))
+
+	gopkg := flag.Lookup("gopkg")
+	flag.Var(gopkg.Value, "g", fmt.Sprintf("alias to '-%s'", gopkg.Name))
+
+	flag.Parse()
+
+	return fc
+}
+
 func main() {
 	log.SetFlags(log.Lshortfile)
 
-	// setup flags
-	var dbconf db.DBConfig
-	dbconf.Addr = flag.String("a", "localhost:5432", "database Addr")
-	dbconf.User = flag.String("u", "postgres", "database username")
-	dbconf.Password = flag.String("p", "", "database password")
-	dbconf.Name = flag.String("n", "test", "database name")
-	pkg := flag.String("k", "model", "go package name")
-	flag.Parse()
+	fc := setFlags()
 
-	tables, err := db.FindsAllTable(dbconf)
+	tables, err := db.FindsAllTable(fc.db, fc.query)
 	if err != nil {
 		log.Println(err)
+		os.Exit(2)
+	}
+
+	if len(tables) == 0 {
+		fmt.Println("no table found")
 		return
 	}
 
 	// for table info to go struct format
-	r := genStructContent(dbconf, tables, *pkg)
+	r := genStructContent(tables, *fc.gopkg)
 
 	// print MODEL struct
 	fmt.Println(strings.Join(r, "\n"))
 }
 
 // 生成 model 结构体
-func genStructContent(conf db.DBConfig, tables []db.Table, pkg string) []string {
+func genStructContent(tables []db.Table, pkg string) []string {
 	var content = []string{
-		fmt.Sprintf("// all tables from database: \"%s\"", *conf.Name),
 		"package " + pkg,
 		"",
 		"import (", "\t\"github.com/uptrace/bun\"", ")\n",

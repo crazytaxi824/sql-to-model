@@ -11,14 +11,14 @@ import (
 
 var db *bun.DB
 
-type DBConfig struct {
+type Config struct {
 	Addr     *string
 	User     *string
 	Password *string
 	Name     *string
 }
 
-func openDB(conf DBConfig) {
+func openDB(conf Config) {
 	// 连接数据库
 	pgconn := pgdriver.NewConnector(
 		pgdriver.WithAddr(*conf.Addr),
@@ -37,11 +37,11 @@ func openDB(conf DBConfig) {
 	// db.AddQueryHook(&queryHook{})
 }
 
-func FindsAllTable(conf DBConfig) ([]Table, error) {
+func FindsAllTable(conf Config, query QueryOpts) ([]Table, error) {
 	openDB(conf)
 
 	// 获取所有 table
-	tables, err := getAllTable()
+	tables, err := getAllTable(query)
 	if err != nil {
 		return nil, err
 	}
@@ -50,14 +50,14 @@ func FindsAllTable(conf DBConfig) ([]Table, error) {
 }
 
 // 查询数据库内的所有表
-func getAllTable() ([]Table, error) {
-	resp, err := getAllSchemaTableColumnInfo()
+func getAllTable(query QueryOpts) ([]Table, error) {
+	resp, err := getAllSchemaTableColumnInfo(query)
 	if err != nil {
 		return nil, err
 	}
 
 	// 初始化 TableInfo
-	var ti TableObj
+	var ti tableObj
 	ti.tables = make(map[int64]Table)
 
 	// 添加数据

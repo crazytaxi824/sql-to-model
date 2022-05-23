@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"strings"
 
 	"github.com/uptrace/bun"
 )
@@ -20,17 +21,48 @@ type queryResp struct {
 	ColumnDims    int    `bun:"column:dims"`        // array 类型维度
 }
 
-func getAllSchemaTableColumnInfo() ([]queryResp, error) {
-	// 查询所有 user schema
-	// SELECT * FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema';
-	schemas := db.NewSelect().Table("pg_namespace").
-		Column("oid", "nspname").
-		Where("nspname !~ ?", "^pg_").
-		Where("nspname <> ?", "information_schema")
+type QueryOpts struct {
+	// schema name list, seperate with ',' e.g.: "foo,bar",
+	// omitempty - all schemas
+	Schemas *string
 
-	// 根据 schema oid 查询所有 table and view
-	// relkind = 'r' 表示是 table; 'v' 表示是 view.
-	// SELECT * FROM pg_class WHERE relnamespace IN (schema_ids...) AND relkind IN ('r', 'v');
+	// table name list, seperate with ',' e.g.: "foo,bar",
+	// omitempty - all tables
+	// if 'Tables' is specified, then 'TableKind' will be ignored.
+	Tables *string
+
+	// 'r','t','table'-table only;
+	// 'v','view'-view only,
+	// omitempty,other - tables and views,
+	TableKind *string
+}
+
+func getAllSchemaTableColumnInfo(queryConf QueryOpts) ([]queryResp, error) {
+	schemas := getSchemas(*queryConf.Schemas)
+	tables := getTables(schemas, *queryConf.Tables, *queryConf.TableKind)
+	return getColumnsInfo(tables)
+}
+
+// schema subQuery
+func getSchemas(schemaName string) *bun.SelectQuery {
+	schemas := db.NewSelect().Table("pg_namespace").
+		Column("oid", "nspname")
+
+	if schemaName == "" {
+		// list all schema in database
+		schemas = schemas.Where("nspname !~ ?", "^pg_").
+			Where("nspname <> ?", "information_schema")
+	} else {
+		// specify schema name
+		sl := strings.Split(schemaName, ",")
+		schemas = schemas.Where("nspname IN (?)", bun.In(sl))
+	}
+
+	return schemas
+}
+
+// table subQuery
+func getTables(schemas *bun.SelectQuery, tableName, tableKind string) *bun.SelectQuery {
 	tables := db.NewSelect().TableExpr("? AS c", bun.Ident("pg_class")).
 		ColumnExpr("? AS schema_id", bun.Ident("s.oid")).
 		ColumnExpr("? AS schema_name", bun.Ident("s.nspname")).
@@ -40,9 +72,31 @@ func getAllSchemaTableColumnInfo() ([]queryResp, error) {
 		ColumnExpr("? AS table_note", bun.Safe("obj_description(c.oid)")).
 		Join("JOIN (?) AS s", schemas).
 		JoinOn("c.relnamespace = s.oid").
-		Where("c.relnamespace IN (s.oid)").
-		Where("c.relkind IN ('r', 'v')")
+		Where("c.relnamespace IN (s.oid)") // table in schema list
 
+	if tableName != "" {
+		// specify table name
+		ts := strings.Split(tableName, ",")
+		tables = tables.Where("c.relname IN (?)", bun.In(ts)).
+			Where("c.relkind IN ('r', 'v')")
+
+	} else {
+		switch tableKind {
+		case "r", "t", "table":
+			tables = tables.Where("c.relkind = 'r'")
+
+		case "v", "view":
+			tables = tables.Where("c.relkind = 'v'")
+
+		default:
+			tables = tables.Where("c.relkind IN ('r', 'v')")
+		}
+	}
+
+	return tables
+}
+
+func getColumnsInfo(tables *bun.SelectQuery) ([]queryResp, error) {
 	// 根据 table/view oid 查询所有 columns attributes
 	// SELECT * FROM pg_attribute WHERE attrelid IN (table_ids...) AND attnum>0 AND format_type(atttypid, atttypmod) <> '-';
 	var resp []queryResp

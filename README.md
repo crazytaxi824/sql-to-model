@@ -16,7 +16,7 @@ SELECT * FROM pg_class WHERE relnamespace IN (2200, 16410, 16418) AND relkind IN
 -- 根据 table/view oid 查询所有 columns attributes.
 -- IN (16385, 16435, 16393...) 都是上面 sql 查询出来的 table oid.
 SELECT *
-FROM pg_attribute 
+FROM pg_attribute
 WHERE attrelid IN (16385, 16435, 16393...) AND attnum>0 AND format_type(atttypid, atttypmod) <> '-';
 ```
 
@@ -116,6 +116,6 @@ $ stm -a 127.0.0.1 -p 5432 -pwd xxx -db postgres -o ~/Desktop/go_model.go
 
 ## TODO
 
-- array_agg()
+- output package comments
 
-- jsonb_agg()
+- flags alias
