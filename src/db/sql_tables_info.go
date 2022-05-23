@@ -21,7 +21,7 @@ type queryResp struct {
 	ColumnDims    int    `bun:"column:dims"`        // array 类型维度
 }
 
-type QueryConf struct {
+type QueryOpts struct {
 	// schema name list, seperate with ',' e.g.: "foo,bar",
 	// omitempty - all schemas
 	Schemas *string
@@ -37,7 +37,7 @@ type QueryConf struct {
 	TableKind *string
 }
 
-func getAllSchemaTableColumnInfo(queryConf QueryConf) ([]queryResp, error) {
+func getAllSchemaTableColumnInfo(queryConf QueryOpts) ([]queryResp, error) {
 	schemas := getSchemas(*queryConf.Schemas)
 	tables := getTables(schemas, *queryConf.Tables, *queryConf.TableKind)
 	return getColumnsInfo(tables)

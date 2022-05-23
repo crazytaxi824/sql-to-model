@@ -17,12 +17,12 @@ type Table struct {
 	Columns []Column
 }
 
-type TableObj struct {
+type tableObj struct {
 	order  []int64
 	tables map[int64]Table
 }
 
-func (t *TableObj) addTableInfo(r queryResp) {
+func (t *tableObj) addTableInfo(r queryResp) {
 	// table exists
 	table, ok := t.tables[r.TableID]
 	if ok {
@@ -55,7 +55,7 @@ func (t *TableObj) addTableInfo(r queryResp) {
 	}
 }
 
-func (t *TableObj) SortedOutput() []Table {
+func (t *tableObj) SortedOutput() []Table {
 	var tables []Table
 	for _, id := range t.order {
 		tables = append(tables, t.tables[id])

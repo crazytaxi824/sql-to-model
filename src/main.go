@@ -10,8 +10,8 @@ import (
 )
 
 type flagConfig struct {
-	db    db.DBConfig
-	query db.QueryConf
+	db    db.Config
+	query db.QueryOpts
 
 	// other flags
 	gopkg *string
@@ -83,7 +83,7 @@ func main() {
 }
 
 // 生成 model 结构体
-func genStructContent(conf db.DBConfig, tables []db.Table, pkg string) []string {
+func genStructContent(conf db.Config, tables []db.Table, pkg string) []string {
 	var content = []string{
 		fmt.Sprintf("// all tables from database: \"%s\"", *conf.Name),
 		"package " + pkg,

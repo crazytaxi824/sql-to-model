@@ -24,7 +24,7 @@ func TestMajor(_ *testing.T) {
 	log.SetFlags(log.Lshortfile)
 
 	// setup flags
-	var dbconf db.DBConfig
+	var dbconf db.Config
 	dbconf.Addr = flag.String("a", "172.16.238.128:15432", "database Addr")
 	// dbconf.Addr = flag.String("a", "192.168.0.193:15432", "database Addr")
 	dbconf.User = flag.String("u", "postgres", "database username")
@@ -33,7 +33,7 @@ func TestMajor(_ *testing.T) {
 	pkg := flag.String("g", "model", "go package name")
 
 	// query config
-	var queryConf db.QueryConf
+	var queryConf db.QueryOpts
 	queryConf.Schemas = flag.String("s", "foo,view", "specify schema list. eg:'foo,bar', omitempty - all schemas")
 	queryConf.Tables = flag.String("t", "", "specify table list. eg:'foo,bar', omitempty - all tables")
 	queryConf.TableKind = flag.String("k", "", "specify table or view, 't','r','table'-table; 'v','view'-view; others,omitempty-tables and views")
