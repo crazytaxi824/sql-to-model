@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"local/src/db"
@@ -72,20 +73,24 @@ func main() {
 	tables, err := db.FindsAllTable(fc.db, fc.query)
 	if err != nil {
 		log.Println(err)
+		os.Exit(2)
+	}
+
+	if len(tables) == 0 {
+		fmt.Println("no table found")
 		return
 	}
 
 	// for table info to go struct format
-	r := genStructContent(fc.db, tables, *fc.gopkg)
+	r := genStructContent(tables, *fc.gopkg)
 
 	// print MODEL struct
 	fmt.Println(strings.Join(r, "\n"))
 }
 
 // 生成 model 结构体
-func genStructContent(conf db.Config, tables []db.Table, pkg string) []string {
+func genStructContent(tables []db.Table, pkg string) []string {
 	var content = []string{
-		fmt.Sprintf("// all tables from database: \"%s\"", *conf.Name),
 		"package " + pkg,
 		"",
 		"import (", "\t\"github.com/uptrace/bun\"", ")\n",
