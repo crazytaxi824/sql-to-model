@@ -116,6 +116,6 @@ $ stm -a 127.0.0.1 -p 5432 -pwd xxx -db postgres -o ~/Desktop/go_model.go
 
 ## TODO
 
-- array_agg()
+- schema
 
-- jsonb_agg()
+- view / table
