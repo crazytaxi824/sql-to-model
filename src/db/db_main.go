@@ -37,11 +37,11 @@ func openDB(conf DBConfig) {
 	// db.AddQueryHook(&queryHook{})
 }
 
-func FindsAllTable(conf DBConfig) ([]Table, error) {
+func FindsAllTable(conf DBConfig, query QueryConf) ([]Table, error) {
 	openDB(conf)
 
 	// 获取所有 table
-	tables, err := getAllTable()
+	tables, err := getAllTable(query)
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +50,8 @@ func FindsAllTable(conf DBConfig) ([]Table, error) {
 }
 
 // 查询数据库内的所有表
-func getAllTable() ([]Table, error) {
-	resp, err := getAllSchemaTableColumnInfo()
+func getAllTable(query QueryConf) ([]Table, error) {
+	resp, err := getAllSchemaTableColumnInfo(query)
 	if err != nil {
 		return nil, err
 	}

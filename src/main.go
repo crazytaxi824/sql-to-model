@@ -14,14 +14,20 @@ func main() {
 
 	// setup flags
 	var dbconf db.DBConfig
-	dbconf.Addr = flag.String("a", "localhost:5432", "database Addr")
-	dbconf.User = flag.String("u", "postgres", "database username")
-	dbconf.Password = flag.String("p", "", "database password")
-	dbconf.Name = flag.String("n", "test", "database name")
-	pkg := flag.String("k", "model", "go package name")
+	dbconf.Addr = flag.String("a", "localhost:5432", "database Addr\n")
+	dbconf.User = flag.String("u", "postgres", "database username\n")
+	dbconf.Password = flag.String("p", "", "database password\n")
+	dbconf.Name = flag.String("n", "test", "database name\n")
+	pkg := flag.String("g", "model", "go package name\n")
+
+	// query config
+	var queryConf db.QueryConf
+	queryConf.Schemas = flag.String("s", "", "specify schema list. eg:'foo,bar', omitempty - all schemas\n")
+	queryConf.Tables = flag.String("t", "", "specify table list. eg:'foo,bar', omitempty - all tables\n")
+	queryConf.TableKind = flag.String("k", "", "specify table or view\n't', 'r', 'table' - table only;\n'v', 'view' - view only;\nomitempty, others - tables and views\n")
 	flag.Parse()
 
-	tables, err := db.FindsAllTable(dbconf)
+	tables, err := db.FindsAllTable(dbconf, queryConf)
 	if err != nil {
 		log.Println(err)
 		return
